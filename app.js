@@ -3,9 +3,11 @@ require('dotenv').config();
 const express = require("express");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const md5 = require("md5");
+const bcrypt = require('bcrypt');
+// const md5 = require("md5");
 // const encrypt = require("mongoose-encryption");
 
+const saltRounds = 10;
 const app = express();
 
 async function main() {
@@ -41,35 +43,42 @@ app.get("/register", (req, res) => {
 });
 
 app.post("/register", (req, res) => {
-  console.log(req.body);
-  const newUser = new User({
-    username: req.body.username,
-    password: md5(req.body.password),
-  });
-
-  newUser.save((err, doc) => {
-    if (err) {
+  bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+    if (err){
       console.log(err);
     } else {
-      res.render("secrets");
-    };
+      const newUser = new User({
+        username: req.body.username,
+        password: hash,
+      });
+      newUser.save((err, doc) => {
+        if (err) {
+          console.log(err);
+        } else {
+          res.render("secrets");
+        };
+      });
+    }
   });
 });
 
 app.post("/login", (req, res) => {
   const login_username = req.body.username;
-  const login_password = md5(req.body.password);
+  const login_password = req.body.password;
 
   User.findOne({username: login_username}, (err, foundUser) => {
     if (err) {
       console.log(err);
     } else {
       if (foundUser) {
-        if (foundUser.password === login_password) {
-          res.render("secrets");
-        } else {
-          console.log("Incorrect Password");
-        }
+        bcrypt.compare(login_password, foundUser.password, function(err, result) {
+          if (result) {
+            res.render("secrets");
+          } else {
+            console.log(err);
+            console.log("wrong password");
+          };
+        });
       } else {
         console.log("No user found");
       };
